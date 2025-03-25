@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Research System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>Automated Research Report Generator</h1>
+    <form id="reportForm">
+        <label for="topic">Topic:</label>
+        <input type="text" id="topic" name="topic" value="ai_ethics">
+        <button type="submit">Generate Report</button>
+    </form>
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('reportForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const topic = document.getElementById('topic').value;
+            const response = await fetch('/generate_report', {
+                method: 'POST',
+                body: new FormData(document.getElementById('reportForm'))
+            });
+            const result = await response.json();
+            if (result.download_url) {
+                document.getElementById('result').innerHTML = 
+                    `Report generated! <a href="${result.download_url}">Download PDF</a>`;
+            } else {
+                document.getElementById('result').innerHTML = `Error: ${result.error}`;
+            }
+        });
+    </script>
+</body>
+</html>
