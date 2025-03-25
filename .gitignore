@@ -1,0 +1,9 @@
+# Reports directory
+reports/
+reports/temp/
+reports/archive/
+
+# Other generated files
+*.pyc
+__pycache__/
+.env

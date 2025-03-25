@@ -1,32 +1,210 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Research System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>ResearchAI - Automated Research Report Generator</title>
+    <style>
+        :root {
+            --primary: #ff6b35;
+            --primary-dark: #e05a2b;
+            --dark: #1a1a2e;
+            --darker: #16213e;
+            --light: #f8f8f8;
+            --gray: #4a4a4a;
+            --transition: all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            background: var(--darker);
+            color: var(--light);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            color: var(--primary);
+            text-align: center;
+            font-weight: 700;
+            letter-spacing: -1px;
+        }
+
+        .card {
+            background: var(--dark);
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+        }
+
+        form {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        input {
+            flex: 1;
+            padding: 1rem 1.5rem;
+            border: none;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: var(--light);
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+
+        input:focus {
+            outline: none;
+            background: rgba(255,255,255,0.15);
+        }
+
+        button {
+            padding: 1rem 2rem;
+            border: none;
+            background: var(--primary);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+
+        button:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        #result {
+            margin-top: 2rem;
+            padding: 1rem;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .success {
+            background: rgba(46, 213, 115, 0.2);
+            border-left: 4px solid #2ed573;
+        }
+
+        .error {
+            background: rgba(255, 71, 87, 0.2);
+            border-left: 4px solid #ff4757;
+        }
+
+        a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        a:hover {
+            color: var(--primary-dark);
+            text-decoration: underline;
+        }
+
+        .loader {
+            display: none;
+            width: 100%;
+            height: 3px;
+            background: var(--dark);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+
+        .loader::after {
+            content: '';
+            display: block;
+            width: 40%;
+            height: 100%;
+            background: var(--primary);
+            animation: loading 1s infinite ease-in-out;
+        }
+
+        @keyframes loading {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(250%); }
+        }
+    </style>
 </head>
 <body>
-    <h1>Automated Research Report Generator</h1>
-    <form id="reportForm">
-        <label for="topic">Topic:</label>
-        <input type="text" id="topic" name="topic" value="ai_ethics">
-        <button type="submit">Generate Report</button>
-    </form>
-    <div id="result"></div>
+    <div class="container">
+        <h1>ResearchAI</h1>
+        <div class="card">
+            <form id="reportForm">
+                <input type="text" id="topic" name="topic" placeholder="Enter research topic..." value="ai_ethics">
+                <button type="submit">Generate Report</button>
+            </form>
+            <div class="loader" id="loader"></div>
+            <div id="result"></div>
+        </div>
+    </div>
 
     <script>
         document.getElementById('reportForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const topic = document.getElementById('topic').value;
-            const response = await fetch('/generate_report', {
-                method: 'POST',
-                body: new FormData(document.getElementById('reportForm'))
-            });
-            const result = await response.json();
-            if (result.download_url) {
-                document.getElementById('result').innerHTML = 
-                    `Report generated! <a href="${result.download_url}">Download PDF</a>`;
-            } else {
-                document.getElementById('result').innerHTML = `Error: ${result.error}`;
+            const loader = document.getElementById('loader');
+            const result = document.getElementById('result');
+            
+            // Show loader
+            loader.style.display = 'block';
+            result.innerHTML = '';
+            result.className = '';
+            
+            try {
+                const response = await fetch('/generate_report', {
+                    method: 'POST',
+                    body: new FormData(e.target)
+                });
+                const data = await response.json();
+                
+                if (data.download_url) {
+                    // Create hidden iframe for download
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = data.download_url;
+                    document.body.appendChild(iframe);
+                    
+                    result.innerHTML = `
+                        <p>Report generated successfully!</p>
+                        <p><a href="${data.download_url}" class="download-link">Download PDF</a></p>
+                        <p class="note">If download doesn't start automatically, click the link above.</p>`;
+                    result.className = 'success';
+                } else {
+                    result.innerHTML = `<p>Error: ${data.error}</p>`;
+                    result.className = 'error';
+                }
+            } catch (error) {
+                result.innerHTML = '<p>An unexpected error occurred.</p>';
+                result.className = 'error';
+            } finally {
+                loader.style.display = 'none';
             }
         });
     </script>

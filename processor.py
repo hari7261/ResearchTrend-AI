@@ -96,14 +96,29 @@ def summarize_with_gemini(text):
         logger.warning(f"Gemini API summarization failed: {e}")
         return None
 
-def process_data(raw_data):
+def process_data(raw_data, topic):
     processed_data = []
+    gemini_failures = 0
+    max_retries = 3
     
     for item in raw_data:
         text = item['title'] + " " + item.get('abstract', '')
+        summary = None
         
-        # Try Gemini first, fallback to TextRank
-        summary = summarize_with_gemini(text) or text_rank_summarize(text)
+        # Try Gemini with retries
+        for _ in range(max_retries):
+            if gemini_failures < len(raw_data) // 2:  # Only try Gemini if failure rate is low
+                summary = summarize_with_gemini(text)
+                if summary:
+                    break
+                gemini_failures += 1
+            else:
+                logger.warning("Too many Gemini API failures, switching to TextRank")
+                break
+        
+        # Fallback to TextRank if Gemini failed
+        if not summary:
+            summary = text_rank_summarize(text)
         
         # Sentiment with TextBlob
         sentiment = TextBlob(text).sentiment.polarity
@@ -113,7 +128,8 @@ def process_data(raw_data):
             'summary': summary,
             'sentiment': sentiment,
             'source': item['source'],
-            'date': '2025-03-25'  # Static for demo
+            'date': '2025-03-25',
+            'topic': topic  # Add topic to processed data
         })
     return processed_data
 
