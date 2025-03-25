@@ -1,6 +1,6 @@
 # Automated Research Report Generator
 ## Technical Documentation and Project Report
-### March 2025
+### 2024
 
 ## Table of Contents
 1. Executive Summary
@@ -17,7 +17,7 @@
 12. Security Considerations
 
 ## 1. Executive Summary
-The Automated Research Report Generator is a sophisticated web application designed to automate the process of gathering, analyzing, and presenting research information from multiple sources. The system combines web scraping, natural language processing, and document generation capabilities to create comprehensive research reports on any given topic.
+The Automated Research Report Generator is an AI-powered web application that combines web scraping, natural language processing, and document generation to create comprehensive research reports. It leverages Google's Gemini API for advanced text analysis and summarization, making it particularly effective for analyzing complex research topics.
 
 ## 2. Problem Statement
 ### 2.1 Background
