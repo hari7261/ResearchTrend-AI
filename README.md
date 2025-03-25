@@ -110,11 +110,18 @@ pdoc --html .
 
 MIT License - see [LICENSE](LICENSE) for details
 
-## 👥 Team
+## 👤 Developer
 
-- Lead Developer - [@dev_lead](https://github.com/dev_lead)
-- ML Engineer - [@ml_expert](https://github.com/ml_expert)
-- Frontend Dev - [@frontend_dev](https://github.com/frontend_dev)
+<div align="center">
+  <img src="https://avatars.githubusercontent.com/hari7261" width="100" style="border-radius: 50%;" alt="Hariom Kumar Pandit"/>
+  
+  ### Hariom Kumar Pandit
+  Fullstack Developer
+  
+  [![GitHub](https://img.shields.io/badge/GitHub-hari7261-181717?style=flat-square&logo=github)](https://github.com/hari7261)
+  [![LinkedIn](https://img.shields.io/badge/LinkedIn-Hariom_Kumar-0077B5?style=flat-square&logo=linkedin)](https://linkedin.com/in/hariomkumarpandit)
+  [![Portfolio](https://img.shields.io/badge/Portfolio-Visit_Site-00A98F?style=flat-square&logo=about.me)](https://hari7261.github.io)
+</div>
 
 ## 🌟 Acknowledgments
 
@@ -124,8 +131,8 @@ MIT License - see [LICENSE](LICENSE) for details
 
 ---
 <div align="center">
-  Made with ❤️ by ResearchAI Team
+  Built with 💻 by Hariom Kumar Pandit
   
-  [![Follow on Twitter](https://img.shields.io/twitter/follow/reserchai?style=social)](https://twitter.com/reserchai)
-  [![Star on GitHub](https://img.shields.io/github/stars/yourusername/reserchai?style=social)](https://github.com/yourusername/reserchai)
+  [![Follow on Twitter](https://img.shields.io/twitter/follow/hari7261?style=social)](https://twitter.com/hari7261)
+  [![Star on GitHub](https://img.shields.io/github/stars/hari7261/reserchai?style=social)](https://github.com/hari7261/reserchai)
 </div>
