@@ -1,6 +1,7 @@
 import requests
 from textblob import TextBlob
 import nltk
+import time
 from nltk.tokenize import word_tokenize, sent_tokenize
 from nltk.corpus import stopwords
 import numpy as np
@@ -66,19 +67,32 @@ def summarize_with_gemini(text, retries=3):
         try:
             if not text:
                 return None
-                
-            headers = {'Content-Type': 'application/json'}
+            
+            # Limit text length
+            text = text[:1000] if len(text) > 1000 else text
+            
+            headers = {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': GEMINI_API_KEY
+            }
+            
             data = {
                 "contents": [{
-                    "parts": [{"text": f"Summarize this text concisely in 2-3 sentences: {text}"}]
-                }]
+                    "parts": [{
+                        "text": f"Provide a concise 2-3 sentence summary of: {text}"
+                    }]
+                }],
+                "generationConfig": {
+                    "temperature": 0.7,
+                    "maxOutputTokens": 200
+                }
             }
             
             response = requests.post(
-                f"{GEMINI_URL}?key={GEMINI_API_KEY}",
+                GEMINI_URL,
                 headers=headers,
                 json=data,
-                timeout=10
+                timeout=15
             )
             
             if response.status_code == 200:
@@ -86,33 +100,45 @@ def summarize_with_gemini(text, retries=3):
                 if 'candidates' in result and result['candidates']:
                     return result['candidates'][0]['content']['parts'][0]['text']
             
-            time.sleep(1)  # Wait before retry
+            logger.warning(f"Gemini API attempt {attempt + 1} failed with status {response.status_code}")
+            logger.debug(f"Response: {response.text}")
+            time.sleep(2)
             
         except Exception as e:
-            logger.warning(f"Gemini API attempt {attempt + 1} failed: {e}")
-            time.sleep(1)
+            logger.warning(f"Gemini API attempt {attempt + 1} failed: {str(e)}")
+            time.sleep(2)
     
     return None
 
 def get_topic_analysis(text, topic):
     """Get detailed analysis using Gemini API"""
     try:
-        headers = {'Content-Type': 'application/json'}
+        headers = {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': GEMINI_API_KEY
+        }
+        
         prompt = f"""Analyze this text about '{topic}' and provide:
 1. Key findings
 2. Main themes
 3. Important statistics or data points
 4. Related implications
 Text: {text}"""
-        
+
         data = {
             "contents": [{
-                "parts": [{"text": prompt}]
-            }]
+                "parts": [{
+                    "text": prompt
+                }]
+            }],
+            "generationConfig": {
+                "temperature": 0.7,
+                "maxOutputTokens": 500
+            }
         }
         
         response = requests.post(
-            f"{GEMINI_URL}?key={GEMINI_API_KEY}",
+            GEMINI_URL,
             headers=headers,
             json=data,
             timeout=15
@@ -127,57 +153,54 @@ Text: {text}"""
         logger.warning(f"Gemini analysis failed: {e}")
         return None
 
+def clean_source_text(text, source):
+    """Clean text based on source-specific patterns"""
+    text = text.replace('\n', ' ').strip()
+    if 'times_of_india' in source.lower():
+        text = text.split('READ MORE')[0]
+    elif 'hindustan_times' in source.lower():
+        text = text.split('Also Read')[0]
+    elif 'ndtv' in source.lower():
+        text = text.split('Read more')[0]
+    return text.strip()
+
 def process_data(raw_data, topic):
     processed_data = []
     gemini_failures = 0
-    max_retries = 3
     
-    # Group data by source
-    source_groups = {}
+    # Group similar content to reduce API calls
+    grouped_data = {}
     for item in raw_data:
         source = item['source']
-        if source not in source_groups:
-            source_groups[source] = []
-        source_groups[source].append(item)
+        if source not in grouped_data:
+            grouped_data[source] = []
+        grouped_data[source].append(item)
     
-    # Process each source group
-    for source, items in source_groups.items():
-        combined_text = " ".join([f"{i['title']}. {i.get('abstract', '')}" for i in items])
+    for source, items in grouped_data.items():
+        # Process each source group
+        combined_text = " ".join([
+            f"{item['title']}. {item.get('abstract', '')}" 
+            for item in items
+        ])
         
-        # Try Gemini analysis
-        analysis = get_topic_analysis(combined_text, topic)
+        # Get one summary for similar content
+        summary = summarize_with_gemini(combined_text)
+        if summary:
+            logger.info(f"Successfully generated summary for {source}")
+        else:
+            logger.warning(f"Using TextRank fallback for {source}")
+            summary = text_rank_summarize(combined_text)
         
+        # Process individual items
         for item in items:
-            text = item['title'] + " " + item.get('abstract', '')
-            summary = None
-            
-            # Try Gemini with retries
-            for _ in range(max_retries):
-                if gemini_failures < len(raw_data) // 2:  # Only try Gemini if failure rate is low
-                    summary = summarize_with_gemini(text)
-                    if summary:
-                        break
-                    gemini_failures += 1
-                else:
-                    logger.warning("Too many Gemini API failures, switching to TextRank")
-                    break
-            
-            # Fallback to TextRank if Gemini failed
-            if not summary:
-                summary = text_rank_summarize(text)
-            
-            # Sentiment with TextBlob
-            sentiment = TextBlob(text).sentiment.polarity
-            
             processed_data.append({
                 'title': item['title'],
                 'summary': summary,
-                'analysis': analysis,  # Add detailed analysis
-                'sentiment': sentiment,
+                'sentiment': TextBlob(item.get('abstract', '')).sentiment.polarity,
                 'source': source,
-                'date': item.get('published_at', '2025-03-25'),
+                'date': item.get('published_at', datetime.now().strftime('%Y-%m-%d')),
                 'url': item.get('url', ''),
-                'topic': topic  # Add topic to processed data
+                'topic': topic
             })
     
     return processed_data
