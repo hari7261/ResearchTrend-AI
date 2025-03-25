@@ -13,6 +13,8 @@ import ssl
 from selenium.common.exceptions import TimeoutException
 from retrying import retry
 import time
+from newsapi import NewsApiClient
+from datetime import datetime, timedelta
 
 # Disable SSL verification warnings
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -20,102 +22,138 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def scrape_data(topic):
-    data = []
+NEWS_API_KEY = "87367266557c4ec3828ec58ec54fde10"  # Replace with valid key
+NEWS_SOURCES = {
+    'times_of_india': {
+        'url': 'https://timesofindia.indiatimes.com/topic/{}',
+        'selector': '.article',  # Updated selector
+        'title': '.title a, h3 a',
+        'abstract': '.summary, .article-content'
+    },
+    'hindustan_times': {
+        'url': 'https://www.hindustantimes.com/topic/{}',  # Changed to topic URL
+        'selector': '.story-card',
+        'title': '.hdg3 a, .story-headline',
+        'abstract': '.story-desc'
+    },
+    'ndtv': { 
+        'url': 'https://www.ndtv.com/topic/{}',  # Changed to topic URL
+        'selector': '.news_item',
+        'title': '.newsHdng a, .headline',
+        'abstract': '.newsCont, .description'
+    },
+    'the_hindu': {
+        'url': 'https://www.thehindu.com/topic/{}',  # Changed to topic URL
+        'selector': '.story-card-news',
+        'title': '.story-card-news h3',
+        'abstract': '.story-card-news p'
+    }
+}
+
+def setup_webdriver():
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--ignore-certificate-errors')
+    options.add_argument('--disable-dev-shm-usage')
+    options.page_load_strategy = 'eager'
+    options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
     
-    # Static scrape (e.g., arXiv)
-    try:
-        url = f"https://arxiv.org/search/?query={topic}&searchtype=all"
-        logger.info(f"Scraping arXiv: {url}")
-        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10, verify=False)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.content, 'html.parser')
-        papers = soup.find_all('li', class_='arxiv-result')[:5]
-        if not papers:
-            logger.warning("No papers found on arXiv. Check if class 'arxiv-result' is still valid.")
-        else:
-            logger.info(f"Found {len(papers)} papers on arXiv")
-        for p in papers:
-            title_elem = p.find('p', class_='title')
-            abstract_elem = p.find('span', class_='abstract-full')
-            title = title_elem.text.strip() if title_elem else "No title"
-            abstract = abstract_elem.text.strip() if abstract_elem else "No abstract"
-            data.append({'title': title, 'abstract': abstract, 'source': 'arXiv'})
-    except requests.RequestException as e:
-        logger.error(f"arXiv scraping failed due to network issue: {e}")
-    except Exception as e:
-        logger.error(f"arXiv scraping failed unexpectedly: {e}")
+    service = Service(ChromeDriverManager().install())
+    return webdriver.Chrome(service=service, options=options)
 
-    @retry(stop_max_attempt_number=3, wait_fixed=2000)
-    def scrape_techcrunch(driver, topic):
-        try:
-            url = f"https://techcrunch.com/search/{topic}"
-            logger.info(f"Scraping TechCrunch: {url}")
-            
-            driver.set_page_load_timeout(15)  # Reduced timeout
-            driver.get(url)
-            time.sleep(5)  # Allow JS to load
-            
-            wait = WebDriverWait(driver, 10)
-            articles = wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div.post-block')))
-            
-            if not articles:
-                articles = driver.find_elements(By.CSS_SELECTOR, 'article.post-block')
-            
-            if not articles:
-                articles = driver.find_elements(By.CSS_SELECTOR, '.article__block')
-                
-            return articles[:5] if articles else []
-            
-        except TimeoutException:
-            logger.warning("TechCrunch page load timeout, retrying...")
-            raise
-        except Exception as e:
-            logger.error(f"TechCrunch scraping error: {e}")
-            raise
-
-    # TechCrunch scraping with retry
+def scrape_news_source(driver, source_config, topic):
+    results = []
     try:
-        options = Options()
-        options.add_argument('--headless')
-        options.add_argument('--ignore-certificate-errors')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--no-sandbox')
-        options.page_load_strategy = 'eager'  # Added for faster loading
+        formatted_topic = topic.replace('_', '-')
+        url = source_config['url'].format(formatted_topic)
+        logger.info(f"Scraping {url}")
         
-        driver = webdriver.Chrome(
-            service=Service(ChromeDriverManager().install()),
-            options=options
-        )
+        driver.get(url)
+        time.sleep(5)  # Allow JS to load
         
-        articles = scrape_techcrunch(driver, topic)
+        elements = driver.find_elements(By.CSS_SELECTOR, source_config['selector'])
         
-        for article in articles:
+        for element in elements[:5]:
             try:
-                title = article.find_element(By.CSS_SELECTOR, 'h2, .article__title').text.strip()
-                excerpt = article.find_element(By.CSS_SELECTOR, '.post-block__content, .article__excerpt').text.strip()
-                data.append({
-                    'title': title,
-                    'abstract': excerpt,
-                    'source': 'TechCrunch'
-                })
+                title = element.find_element(By.CSS_SELECTOR, source_config['title']).text.strip()
+                abstract = element.find_element(By.CSS_SELECTOR, source_config['abstract']).text.strip()
+                
+                if title and abstract:
+                    results.append({
+                        'title': title,
+                        'abstract': abstract,
+                        'source': source_config['name'],
+                        'url': url,
+                        'published_at': datetime.now().strftime('%Y-%m-%d'),
+                        'category': 'news'
+                    })
             except Exception as e:
-                logger.warning(f"Error extracting article data: {e}")
                 continue
                 
-        driver.quit()
+        return results
     except Exception as e:
-        logger.error(f"TechCrunch scraping failed: {e}")
-        if 'driver' in locals():
-            driver.quit()
+        logger.error(f"Error scraping {source_config['name']}: {e}")
+        return []
 
-    # If no data was found, add some default data to prevent errors
+def scrape_data(topic):
+    data = []
+    driver = None
+    
+    try:
+        driver = setup_webdriver()
+        
+        # Scrape news sources
+        for source_name, config in NEWS_SOURCES.items():
+            try:
+                config['name'] = source_name
+                results = scrape_news_source(driver, config, topic)
+                if results:
+                    data.extend(results)
+                time.sleep(2)
+            except Exception as e:
+                logger.error(f"Failed to scrape {source_name}: {e}")
+                continue
+        
+        # Fallback to NewsAPI if we don't have enough data
+        if len(data) < 5:
+            try:
+                newsapi = NewsApiClient(api_key=NEWS_API_KEY)
+                response = newsapi.get_everything(
+                    q=topic,
+                    language='en',
+                    sort_by='relevancy',
+                    page_size=5
+                )
+                
+                if response.get('articles'):
+                    for article in response['articles']:
+                        data.append({
+                            'title': article['title'],
+                            'abstract': article['description'] or article['title'],
+                            'source': article['source']['name'],
+                            'url': article['url'],
+                            'published_at': article['publishedAt'],
+                            'category': 'news'
+                        })
+            except Exception as e:
+                logger.error(f"NewsAPI error: {e}")
+        
+    except Exception as e:
+        logger.error(f"Scraping error: {e}")
+    finally:
+        if driver:
+            driver.quit()
+    
+    # Ensure minimum data
     if not data:
         data.append({
-            'title': f'Recent developments in {topic}',
-            'abstract': f'Analysis of recent trends in {topic}.',
-            'source': 'Default Source'
+            'title': f'Research on {topic}',
+            'abstract': f'Analysis of {topic} trends and developments.',
+            'source': 'Research Summary',
+            'published_at': datetime.now().strftime('%Y-%m-%d'),
+            'category': 'research'
         })
-
-    logger.info(f"Scraped {len(data)} items")
+    
     return data

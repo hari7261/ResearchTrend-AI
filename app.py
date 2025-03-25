@@ -77,7 +77,21 @@ def generate_report():
 
 @app.route('/download/<filename>')
 def download_file(filename):
-    return send_file(os.path.join(REPORTS_ARCHIVE, filename), as_attachment=True)
+    try:
+        file_path = os.path.join(REPORTS_ARCHIVE, filename)
+        if os.path.exists(file_path):
+            return send_file(
+                file_path,
+                as_attachment=True,
+                download_name=filename,
+                mimetype='application/pdf'
+            )
+        else:
+            logger.error(f"File not found: {file_path}")
+            return jsonify({'error': 'File not found'}), 404
+    except Exception as e:
+        logger.error(f"Download failed: {e}")
+        return jsonify({'error': 'Failed to download file'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

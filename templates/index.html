@@ -150,6 +150,24 @@
             0% { transform: translateX(-100%); }
             100% { transform: translateX(250%); }
         }
+
+        .download-button {
+            display: block;
+            margin-top: 1rem;
+            padding: 0.75rem 1.5rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+        
+        .download-button:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body>
@@ -172,7 +190,6 @@
             const loader = document.getElementById('loader');
             const result = document.getElementById('result');
             
-            // Show loader
             loader.style.display = 'block';
             result.innerHTML = '';
             result.className = '';
@@ -185,16 +202,11 @@
                 const data = await response.json();
                 
                 if (data.download_url) {
-                    // Create hidden iframe for download
-                    const iframe = document.createElement('iframe');
-                    iframe.style.display = 'none';
-                    iframe.src = data.download_url;
-                    document.body.appendChild(iframe);
-                    
                     result.innerHTML = `
                         <p>Report generated successfully!</p>
-                        <p><a href="${data.download_url}" class="download-link">Download PDF</a></p>
-                        <p class="note">If download doesn't start automatically, click the link above.</p>`;
+                        <button onclick="downloadReport('${data.download_url}')" class="download-button">
+                            Download Report
+                        </button>`;
                     result.className = 'success';
                 } else {
                     result.innerHTML = `<p>Error: ${data.error}</p>`;
@@ -207,6 +219,10 @@
                 loader.style.display = 'none';
             }
         });
+
+        function downloadReport(url) {
+            window.location.href = url;
+        }
     </script>
 </body>
 </html>

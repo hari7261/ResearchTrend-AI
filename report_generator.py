@@ -46,25 +46,42 @@ def analyze_topic_insights(data):
 
 def create_trend_chart(trends, filename):
     try:
-        # Create figure without using pyplot
+        if not trends:
+            logger.warning("No trends data available")
+            return False
+            
         fig = Figure(figsize=(10, 6))
         canvas = FigureCanvas(fig)
         ax = fig.add_subplot(111)
         
-        terms, counts = zip(*trends)
-        bars = ax.bar(terms, counts)
-        ax.set_title("Top Trending Topics", fontsize=14, pad=20)
-        ax.tick_params(axis='x', rotation=45, ha='right')
+        # Ensure we have data to plot
+        if len(trends) < 2:
+            terms = [trends[0][0] if trends else "No Data"]
+            counts = [trends[0][1] if trends else 0]
+        else:
+            terms, counts = zip(*trends)
+            
+        bars = ax.bar(range(len(terms)), counts)
+        
+        # Configure x-axis
+        ax.set_xticks(range(len(terms)))
+        ax.set_xticklabels(terms, rotation=45)
+        
+        # Adjust layout to prevent label cutoff
+        fig.tight_layout()
         
         # Add value labels
         for bar in bars:
             height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2., height,
-                   f'{int(height)}',
-                   ha='center', va='bottom')
+            ax.text(
+                bar.get_x() + bar.get_width()/2.,
+                height,
+                f'{int(height)}',
+                horizontalalignment='center',
+                verticalalignment='bottom'
+            )
         
-        fig.tight_layout()
-        fig.savefig(filename, dpi=300, bbox_inches='tight')
+        fig.savefig(filename, bbox_inches='tight', dpi=300)
         return True
     except Exception as e:
         logger.error(f"Error creating trend chart: {e}")
@@ -133,67 +150,165 @@ def clean_and_filter_trends(trends, min_length=3):
             and term.isalnum()
             and term not in stopwords]
 
-def generate_pdf(data, trends, filename):
-    doc = SimpleDocTemplate(filename, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=72)
-    styles = getSampleStyleSheet()
-    story = []
-
-    # Add custom styles
-    styles.add(ParagraphStyle(
-        name='CustomTitle',
-        parent=styles['Title'],
-        fontSize=24,
-        spaceAfter=30,
-        textColor=colors.HexColor('#1a1a2e')
-    ))
-    
-    styles.add(ParagraphStyle(
-        name='CustomHeading',
-        parent=styles['Heading1'],
-        fontSize=18,
-        spaceAfter=16,
-        textColor=colors.HexColor('#ff6b35')
-    ))
-    
-    styles.add(ParagraphStyle(
-        name='Insight',
-        parent=styles['BodyText'],
-        fontSize=12,
-        spaceAfter=12,
-        textColor=colors.HexColor('#4a4a4a'),
-        bulletIndent=20,
-        leftIndent=20
-    ))
-
-    # Cover page
-    topic = data[0].get('topic', 'Research')
-    story.append(Paragraph(f"{topic.replace('_', ' ').title()} Research Report", styles['CustomTitle']))
-    story.append(Paragraph(f"Generated on {data[0]['date']}", styles['Heading2']))
-    story.append(Spacer(1, 30))
-
-    # AI Insights
-    story.append(Paragraph("Key Insights", styles['CustomHeading']))
-    insights = analyze_topic_insights(data)
-    for insight in insights:
-        story.append(Paragraph(f"• {insight}", styles['Insight']))
-    story.append(Spacer(1, 20))
-
-    # Add Word Cloud
-    story.append(Paragraph("Topic Overview", styles['CustomHeading']))
-    wordcloud_path = f"{filename.replace('.pdf', '_wordcloud.png')}"
-    if create_word_cloud(data, wordcloud_path):
-        story.append(Image(wordcloud_path, width=400, height=200))
-    story.append(Spacer(1, 20))
-
-    # Filter trends before visualization
-    filtered_trends = clean_and_filter_trends(trends)
-    
-    # Create charts with filtered data
-    trend_chart_path = f"{filename.replace('.pdf', '_trends.png')}"
-    if create_trend_chart(filtered_trends[:10], trend_chart_path):
-        story.append(Image(trend_chart_path, width=400, height=200))
-        
+def create_time_trend_chart(time_trends, filename):
     try:
+        fig = Figure(figsize=(12, 6))
+        canvas = FigureCanvas(fig)
+        ax = fig.add_subplot(111)
+        
+        dates = sorted(time_trends.keys())
+        counts = [len(time_trends[date]) for date in dates]
+        
+        ax.plot(dates, counts, marker='o')
+        ax.set_title("Content Publication Timeline", fontsize=14, pad=20)
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Number of Articles")
+        ax.tick_params(axis='x', rotation=45)
+        
+        fig.tight_layout()
+        fig.savefig(filename, dpi=300, bbox_inches='tight')
+        return True
+    except Exception as e:
+        logger.error(f"Error creating time trend chart: {e}")
+        return False
+
+def generate_pdf(data, trends_data, filename):
+    try:
+        doc = SimpleDocTemplate(filename, pagesize=letter, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=72)
+        styles = getSampleStyleSheet()
+        story = []
+
+        # Add custom styles
+        styles.add(ParagraphStyle(
+            name='CustomTitle',
+            parent=styles['Title'],
+            fontSize=24,
+            spaceAfter=30,
+            textColor=colors.HexColor('#1a1a2e')
+        ))
+        
+        styles.add(ParagraphStyle(
+            name='CustomHeading',
+            parent=styles['Heading1'],
+            fontSize=18,
+            spaceAfter=16,
+            textColor=colors.HexColor('#ff6b35')
+        ))
+        
+        styles.add(ParagraphStyle(
+            name='Insight',
+            parent=styles['BodyText'],
+            fontSize=12,
+            spaceAfter=12,
+            textColor=colors.HexColor('#4a4a4a'),
+            bulletIndent=20,
+            leftIndent=20
+        ))
+
+        # Cover page
+        topic = data[0].get('topic', 'Research')
+        story.append(Paragraph(f"{topic.replace('_', ' ').title()} Research Report", styles['CustomTitle']))
+        story.append(Paragraph(f"Generated on {data[0]['date']}", styles['Heading2']))
+        story.append(Spacer(1, 30))
+
+        # AI Insights
+        story.append(Paragraph("Key Insights", styles['CustomHeading']))
+        insights = analyze_topic_insights(data)
+        for insight in insights:
+            story.append(Paragraph(f"• {insight}", styles['Insight']))
+        story.append(Spacer(1, 20))
+
+        # Add Word Cloud
+        story.append(Paragraph("Topic Overview", styles['CustomHeading']))
+        wordcloud_path = f"{filename.replace('.pdf', '_wordcloud.png')}"
+        if create_word_cloud(data, wordcloud_path):
+            story.append(Image(wordcloud_path, width=400, height=200))
+        story.append(Spacer(1, 20))
+
+        # Handle trends data properly
+        word_freq = trends_data.get('word_freq', [])
+        time_trends = trends_data.get('time_trends', {})
+        sources = trends_data.get('sources', Counter())
+        
+        # Add trend analysis if we have word frequency data
+        if word_freq:
+            filtered_trends = clean_and_filter_trends(word_freq)
+            if filtered_trends:
+                trend_chart_path = os.path.join(
+                    os.path.dirname(filename),
+                    f"{os.path.splitext(os.path.basename(filename))[0]}_trends.png"
+                )
+                if create_trend_chart(filtered_trends[:5], trend_chart_path):
+                    story.append(Paragraph("Trend Analysis", styles['CustomHeading']))
+                    story.append(Image(trend_chart_path, width=400, height=200))
+                    story.append(Spacer(1, 20))
+
+        # Add timeline analysis if we have time data
+        if time_trends:
+            timeline_chart = os.path.join(
+                os.path.dirname(filename),
+                f"{os.path.splitext(os.path.basename(filename))[0]}_timeline.png"
+            )
+            if create_time_trend_chart(time_trends, timeline_chart):
+                story.append(Paragraph("Publication Timeline", styles['CustomHeading']))
+                story.append(Image(timeline_chart, width=450, height=250))
+                story.append(Spacer(1, 20))
+
+        # Add source distribution if we have source data
+        if sources:
+            story.append(Paragraph("Source Distribution", styles['CustomHeading']))
+            source_data = list(sources.items())  # Convert Counter items to list of tuples
+            if source_data:
+                source_chart = os.path.join(
+                    os.path.dirname(filename),
+                    f"{os.path.splitext(os.path.basename(filename))[0]}_sources.png"
+                )
+                if create_trend_chart(source_data, source_chart):
+                    story.append(Image(source_chart, width=400, height=200))
+
+        # Add Source-wise Analysis
+        story.append(Paragraph("Source-wise Analysis", styles['CustomHeading']))
+        source_groups = {}
+        for item in data:
+            source = item['source']
+            if source not in source_groups:
+                source_groups[source] = []
+            source_groups[source].append(item)
+        
+        for source, items in source_groups.items():
+            story.append(Paragraph(f"Analysis from {source}", styles['CustomHeading']))
+            if items[0].get('analysis'):
+                story.append(Paragraph(items[0]['analysis'], styles['BodyText']))
+            story.append(Spacer(1, 20))
+
+        # Add summary table
+        table_data = [["Source", "Summary", "Sentiment"]]
+        for d in data:
+            summary = d.get('summary', '')[:200] + '...' if len(d.get('summary', '')) > 200 else d.get('summary', '')
+            sentiment = "Positive" if d['sentiment'] > 0.1 else "Negative" if d['sentiment'] < -0.1 else "Neutral"
+            table_data.append([d['source'], summary, sentiment])
+
+        if len(table_data) > 1:
+            try:
+                story.append(Paragraph("Detailed Analysis", styles['CustomHeading']))
+                table = Table(table_data, colWidths=[1.5*inch, 4*inch, inch])
+                table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a1a2e')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 12),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                    ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]))
+                story.append(table)
+            except Exception as e:
+                logger.error(f"Error adding summary table to PDF: {e}")
+
+        # Build the PDF
         doc.build(story)
         return True
     except Exception as e:
