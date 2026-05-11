@@ -21,7 +21,7 @@ try:
 except Exception as e:
     logging.error(f"Failed to download NLTK data: {e}")
 
-GEMINI_API_KEY = "AIzaSyDn0QOJrVrtCgfFN1v304AMhmh8brEwVqs"
+GEMINI_API_KEY = ""
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
 logger = logging.getLogger(__name__)
