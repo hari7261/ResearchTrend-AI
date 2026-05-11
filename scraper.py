@@ -56,7 +56,7 @@ NEWS_SOURCES = {
 }
 
 # API Keys - Replace with your valid keys
-NEWS_API_KEY = "87367266557c4ec3828ec58ec54fde10"  # Your NewsAPI key
+NEWS_API_KEY = ""  # Your NewsAPI key
 
 def setup_webdriver():
     options = Options()
